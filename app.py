@@ -4,7 +4,8 @@ app=Flask(__name__)
 
 @app.route('/')
 def home():
-    return "hello from flask - running with docker and CI/CD!"
+    hostname = socket.gethostname()
+    return f"Hello from Flask!<br>Handled by Pod: {hostname}"
 
 if __name__=='__main__':
     app.run(host='0.0.0.0', port=5000)
