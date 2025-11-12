@@ -2,8 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: flask-demo
-  labels:
-    app: flask-demo
 spec:
   replicas: 2
   selector:
@@ -21,7 +19,5 @@ spec:
         ports:
         - containerPort: 5000
         env:
-        - name: ENVIRONMENT
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+        - name: BUILD_VERSION
+          value: "local"  # this will be overridden by CI/CD

@@ -1,12 +1,17 @@
-import socket
 from flask import Flask
+import socket, os
 
-app=Flask(__name__)
+app = Flask(__name__)
 
 @app.route('/')
 def home():
     hostname = socket.gethostname()
-    return f"Hello from Flask!<br>Handled by POD: {hostname}"
+    version = os.getenv('BUILD_VERSION', 'local')
+    return f"""
+    <h2>Hello from Flask!</h2>
+    <p>Handled by Pod: <b>{hostname}</b></p>
+    <p>Build Version: <b>{version}</b></p>
+    """
 
-if __name__=='__main__':
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

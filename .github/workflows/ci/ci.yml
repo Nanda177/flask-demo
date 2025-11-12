@@ -17,7 +17,7 @@ jobs:
     - name: Set up Docker
       uses: docker/setup-buildx-action@v3
 
-    # 🔧 Step 3 — Build Docker image with unique tag
+    # 🔧 Step 3 — Build Docker image with unique tag (GitHub run number)
     - name: Build Docker image
       run: |
         docker build -t flask-demo:${{ github.run_number }} .
@@ -29,7 +29,7 @@ jobs:
       with:
         version: 'latest'
 
-    # ☸️ Step 5 — Set up Minikube
+    # ☸️ Step 5 — Start Minikube (local cluster simulation)
     - name: Start Minikube
       uses: medyagh/setup-minikube@master
 
@@ -39,16 +39,13 @@ jobs:
         minikube image load flask-demo:${{ github.run_number }}
         echo "✅ Image loaded into Minikube"
 
-    # 🗂️ Step 7 — Create Namespace if it doesn't exist
-    - name: Create Namespace
+    # 🗂️ Step 7 — Create Namespaces (if not exist)
+    - name: Ensure Namespaces Exist
       run: |
-        if [[ "${{ github.ref_name }}" == "dev" ]]; then
-          kubectl get ns dev || kubectl create namespace dev
-        elif [[ "${{ github.ref_name }}" == "main" ]]; then
-          kubectl get ns prod || kubectl create namespace prod
-        fi
+        kubectl get ns dev  || kubectl create namespace dev
+        kubectl get ns prod || kubectl create namespace prod
 
-    # 🚀 Step 8 — Deploy the New Image Version
+    # 🚀 Step 8 — Apply Deployment and Update Image Based on Branch
     - name: Deploy to Kubernetes
       run: |
         if [[ "${{ github.ref_name }}" == "dev" ]]; then
@@ -63,12 +60,26 @@ jobs:
           kubectl rollout status deployment flask-demo -n prod
         fi
 
-    # 🔍 Step 9 — Verify Deployment
+    # 🧹 Step 9 — Cleanup old pods (optional)
+    - name: Cleanup old pods
+      run: |
+        if [[ "${{ github.ref_name }}" == "dev" ]]; then
+          kubectl delete pod -l app=flask-demo -n dev --ignore-not-found
+        elif [[ "${{ github.ref_name }}" == "main" ]]; then
+          kubectl delete pod -l app=flask-demo -n prod --ignore-not-found
+        fi
+        echo "🧹 Cleaned up old pods"
+
+    # 🔍 Step 10 — Verify Deployment Status
     - name: Verify Deployment
       run: |
-        echo "✅ Checking pod status..."
+        echo "✅ Checking deployment status..."
         if [[ "${{ github.ref_name }}" == "dev" ]]; then
-          kubectl get all -n dev
+          kubectl get deployment flask-demo -n dev
+          kubectl get pods -n dev
+          kubectl describe deployment flask-demo -n dev | grep Image:
         elif [[ "${{ github.ref_name }}" == "main" ]]; then
-          kubectl get all -n prod
+          kubectl get deployment flask-demo -n prod
+          kubectl get pods -n prod
+          kubectl describe deployment flask-demo -n prod | grep Image:
         fi
