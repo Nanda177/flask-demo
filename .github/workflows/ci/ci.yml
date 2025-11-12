@@ -1,0 +1,74 @@
+name: CI/CD for Flask on Kubernetes
+
+on:
+  push:
+    branches: [ "dev", "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 🧱 Step 1 — Checkout code
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 🐳 Step 2 — Set up Docker
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
+
+    # 🔧 Step 3 — Build Docker image
+    - name: Build Docker image
+      run: |
+        docker build -t flask-demo:${{ github.run_number }} .
+        echo "✅ Docker image built successfully"
+
+    # 🧰 Step 4 — Set up kubectl
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'latest'
+
+    # ☸️ Step 5 — Set up Minikube (or use your real cluster later)
+    - name: Start Minikube
+      uses: medyagh/setup-minikube@master
+
+    # 📦 Step 6 — Load Docker image into Minikube
+    - name: Load Docker image
+      run: |
+        minikube image load flask-demo:${{ github.run_number }}
+        echo "✅ Image loaded into Minikube"
+
+    # 🗂️ Step 7 — Create Namespace if it doesn't exist
+    - name: Create Namespace
+      run: |
+        if [[ "${{ github.ref_name }}" == "dev" ]]; then
+          kubectl get ns dev || kubectl create namespace dev
+        elif [[ "${{ github.ref_name }}" == "main" ]]; then
+          kubectl get ns prod || kubectl create namespace prod
+        fi
+
+    # 🚀 Step 8 — Apply Deployment and Service based on branch
+    - name: Apply Kubernetes Manifests
+      run: |
+        if [[ "${{ github.ref_name }}" == "dev" ]]; then
+          echo "🚀 Deploying to DEV namespace"
+          kubectl apply -f deployment.yaml -n dev
+          kubectl rollout restart deployment flask-demo -n dev
+          kubectl rollout status deployment flask-demo -n dev
+        elif [[ "${{ github.ref_name }}" == "main" ]]; then
+          echo "🚀 Deploying to PROD namespace"
+          kubectl apply -f deployment.yaml -n prod
+          kubectl rollout restart deployment flask-demo -n prod
+          kubectl rollout status deployment flask-demo -n prod
+        fi
+
+    # 🔍 Step 9 — Verify Pods and Services
+    - name: Verify Deployment
+      run: |
+        echo "✅ Checking pod status..."
+        if [[ "${{ github.ref_name }}" == "dev" ]]; then
+          kubectl get all -n dev
+        elif [[ "${{ github.ref_name }}" == "main" ]]; then
+          kubectl get all -n prod
+        fi
