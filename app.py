@@ -9,7 +9,7 @@ def home():
     version = os.getenv('BUILD_VERSION', 'local')
     return f"""
     <h2>Hello from Flask!</h2>
-    <p>Handled by Pod: <b>{hostname}</b></p>
+    <p>Handled by POD: <b>{hostname}</b></p>
     <p>Build Version: <b>{version}</b></p>
     """
 
