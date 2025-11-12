@@ -14,10 +14,25 @@ spec:
     spec:
       containers:
       - name: flask-demo
+        # Image name will be dynamically updated by CI/CD pipeline
         image: flask-demo:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5000
         env:
         - name: BUILD_VERSION
-          value: "local"  # this will be overridden by CI/CD
+          value: "local"  # default value, overridden in CI/CD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-service
+spec:
+  type: NodePort
+  selector:
+    app: flask-demo
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+      nodePort: 30001

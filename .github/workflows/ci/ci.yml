@@ -17,7 +17,7 @@ jobs:
     - name: Set up Docker
       uses: docker/setup-buildx-action@v3
 
-    # 🔧 Step 3 — Build Docker image with unique tag (GitHub run number)
+    # 🔧 Step 3 — Build Docker image with unique tag
     - name: Build Docker image
       run: |
         docker build -t flask-demo:${{ github.run_number }} .
@@ -29,7 +29,7 @@ jobs:
       with:
         version: 'latest'
 
-    # ☸️ Step 5 — Start Minikube (local cluster simulation)
+    # ☸️ Step 5 — Start Minikube (Local Kubernetes)
     - name: Start Minikube
       uses: medyagh/setup-minikube@master
 
@@ -39,47 +39,45 @@ jobs:
         minikube image load flask-demo:${{ github.run_number }}
         echo "✅ Image loaded into Minikube"
 
-    # 🗂️ Step 7 — Create Namespaces (if not exist)
+    # 🏷️ Step 7 — Set build version environment variable
+    - name: Set build version env
+      run: |
+        export BUILD_VERSION=${{ github.run_number }}
+        echo "✅ BUILD_VERSION set to $BUILD_VERSION"
+
+    # 🗂️ Step 8 — Create Namespaces (if missing)
     - name: Ensure Namespaces Exist
       run: |
         kubectl get ns dev  || kubectl create namespace dev
         kubectl get ns prod || kubectl create namespace prod
 
-    # 🚀 Step 8 — Apply Deployment and Update Image Based on Branch
+    # 🚀 Step 9 — Apply Deployment and Update Image
     - name: Deploy to Kubernetes
       run: |
         if [[ "${{ github.ref_name }}" == "dev" ]]; then
           echo "🚀 Deploying to DEV namespace"
           kubectl apply -f deployment.yaml -n dev
           kubectl set image deployment/flask-demo flask-demo=flask-demo:${{ github.run_number }} -n dev
+          kubectl set env deployment/flask-demo BUILD_VERSION=${{ github.run_number }} -n dev
           kubectl rollout status deployment flask-demo -n dev
         elif [[ "${{ github.ref_name }}" == "main" ]]; then
           echo "🚀 Deploying to PROD namespace"
           kubectl apply -f deployment.yaml -n prod
           kubectl set image deployment/flask-demo flask-demo=flask-demo:${{ github.run_number }} -n prod
+          kubectl set env deployment/flask-demo BUILD_VERSION=${{ github.run_number }} -n prod
           kubectl rollout status deployment flask-demo -n prod
         fi
 
-    # 🧹 Step 9 — Cleanup old pods (optional)
-    - name: Cleanup old pods
-      run: |
-        if [[ "${{ github.ref_name }}" == "dev" ]]; then
-          kubectl delete pod -l app=flask-demo -n dev --ignore-not-found
-        elif [[ "${{ github.ref_name }}" == "main" ]]; then
-          kubectl delete pod -l app=flask-demo -n prod --ignore-not-found
-        fi
-        echo "🧹 Cleaned up old pods"
-
-    # 🔍 Step 10 — Verify Deployment Status
+    # 🔍 Step 10 — Verify Deployment
     - name: Verify Deployment
       run: |
         echo "✅ Checking deployment status..."
         if [[ "${{ github.ref_name }}" == "dev" ]]; then
           kubectl get deployment flask-demo -n dev
-          kubectl get pods -n dev
           kubectl describe deployment flask-demo -n dev | grep Image:
+          kubectl get pods -n dev
         elif [[ "${{ github.ref_name }}" == "main" ]]; then
           kubectl get deployment flask-demo -n prod
-          kubectl get pods -n prod
           kubectl describe deployment flask-demo -n prod | grep Image:
+          kubectl get pods -n prod
         fi
